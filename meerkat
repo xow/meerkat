@@ -34,10 +34,10 @@ git checkout HEAD .
 
 # TODO: stash pop
 
-after="$(sed <(printf "${after}") 's/^ *[0-9]*//')"
-before="$(sed <(printf "${before}") 's/^ *[0-9]*//')"
+#after="$(sed <(printf "${after}") 's/^ *[0-9]*//')"
+#before="$(sed <(printf "${before}") 's/^ *[0-9]*//')"
 
 printf "${after}" | less
 printf "${before}" | less
 
-diff --new-line-format="" -13 <(printf "${after}") <(printf "${after}") | less
+#diff --new-line-format="" -13 <(printf "${after}") <(printf "${after}") | less
