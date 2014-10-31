@@ -18,4 +18,26 @@ if [ "$option" = "syntax" ]; then
     done;
 fi
 
-printf "${output}" | less
+# TODO: stash first
+
+git checkout ${revision1} -- .
+
+if [ "$option" = "syntax" ]; then
+    for modified_file in ${files}
+    do
+        before=${output}"==\nFile: $modified_file\n==\n"
+        before=$output"$(php local/codechecker/run.php $modified_file)"
+    done;
+fi
+
+git checkout HEAD .
+
+# TODO: stash pop
+
+after="$(sed <(printf "${after}") 's/^ *[0-9]*//')"
+before="$(sed <(printf "${before}") 's/^ *[0-9]*//')"
+
+printf "${after}" | less
+printf "${before}" | less
+
+diff --new-line-format="" -13 <(printf "${after}") <(printf "${after}") | less
