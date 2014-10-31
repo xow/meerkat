@@ -1,0 +1,21 @@
+#!/bin/bash
+
+defaultoption=syntax
+defaultstart=HEAD^ # TODO this should be master HEAD
+defaultend=HEAD
+
+option=${1-$defaultoption}
+revision1=${2-$defaultstart}
+revision2=${3-$defaultend}
+
+files="$(git diff $revision1 $revision2 --name-only)"
+
+if [ "$option" = "syntax" ]; then
+    for modified_file in ${files}
+    do
+        after=${output}"==\nFile: $modified_file\n==\n"
+        after=$output"$(php local/codechecker/run.php $modified_file)"
+    done;
+fi
+
+printf "${output}" | less
