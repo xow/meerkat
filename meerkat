@@ -1,43 +1,93 @@
 #!/bin/bash
 
 defaultoption=syntax
-defaultstart=HEAD^ # TODO this should be master HEAD
+option=${1-$defaultoption}
+
+defaultstart=master # TODO this should be MOODLE_27_STABLE if need be
 defaultend=HEAD
 
-option=${1-$defaultoption}
-revision1=${2-$defaultstart}
-revision2=${3-$defaultend}
+files="$(git diff $defaultstart $defaultend --name-only)"
 
-files="$(git diff $revision1 $revision2 --name-only)"
+if [ "$option" = "syntax" -o "$option" = "all" ]; then
 
-if [ "$option" = "syntax" ]; then
     for modified_file in ${files}
     do
-        after=${output}"==\nFile: $modified_file\n==\n"
-        after=$output"$(php local/codechecker/run.php $modified_file)"
+        after=${after}"==\nFile: $modified_file\n==\n"
+        after=$after"$(php local/codechecker/run.php $modified_file)"
     done;
+
+    # TODO: stash first
+
+    git checkout ${revision1} -- .
+
+    if [ "$option" = "syntax" ]; then
+        for modified_file in ${files}
+        do
+            before=${before}"==\nFile: $modified_file\n==\n"
+            before=$before"$(php local/codechecker/run.php $modified_file)"
+        done;
+    fi
+
+    git checkout HEAD .
+
+    # TODO: stash pop
+
+    #after="$(sed <(printf "${after}") 's/^ *[0-9]*//')"
+    #before="$(sed <(printf "${before}") 's/^ *[0-9]*//')"
+
+    printf "${after}" | less
+    printf "${before}" | less
+
+    #diff --new-line-format="" -13 <(printf "${after}") <(printf "${after}") | less
+
 fi
 
-# TODO: stash first
+if [ "$option" = "test" -o "$option" = "all" ]; then
 
-git checkout ${revision1} -- .
-
-if [ "$option" = "syntax" ]; then
     for modified_file in ${files}
     do
-        before=${output}"==\nFile: $modified_file\n==\n"
-        before=$output"$(php local/codechecker/run.php $modified_file)"
+
+        currentPath=$modified_file
+
+        while [ ! -d "$testDir" -a -n "$currentPath" ]; do
+
+            if [ -n "$currentPath" ]; then
+                tryDir="$currentPath"tests/
+                if [ -d "$tryDir" ]; then
+                    testDir=$tryDir
+                fi
+            fi
+
+            currentDirectory="${currentPath%?}"
+            currentPath="$(echo $currentDirectory | grep -oh '^.*/')"
+
+        done
+
     done;
+
+    # sort | uniq
+
+    if [ -n "$currentPath" ]; then
+
+        if [ -d "$testDir" ]; then
+            tests="$(ls -1d $testDir* | grep _test\.php)"
+
+            while read -r test; do
+                echo "mdk phpunit -r -u "$test
+            done <<< "$tests"
+        fi
+
+        if [ -d "$testDir"/behat ]; then
+            tests="$(ls -1d ${testDir}behat/*)"
+
+            while read -r test; do
+                echo "mdk behat -r -f "$test
+            done <<< "$tests"
+        fi
+
+    fi
+
 fi
 
-git checkout HEAD .
-
-# TODO: stash pop
-
-#after="$(sed <(printf "${after}") 's/^ *[0-9]*//')"
-#before="$(sed <(printf "${before}") 's/^ *[0-9]*//')"
-
-printf "${after}" | less
-printf "${before}" | less
-
-#diff --new-line-format="" -13 <(printf "${after}") <(printf "${after}") | less
+# testdir = the first ancestor directory with a folder called tests
+# ls -1d mod/forum/tests/* | grep "_test\.php" | xargs mdk phpunit -r -u
