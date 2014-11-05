@@ -3,30 +3,31 @@
 defaultoption=syntax
 option=${1-$defaultoption}
 
-beforecommit=master # TODO this should be MOODLE_27_STABLE if need be
-aftercommit=HEAD
+mainbranch=master # TODO this should be MOODLE_27_STABLE if need be
 
-files="$(git diff $beforecommit $aftercommit --name-only)"
+files="$(git diff $mainbranch HEAD --name-only)"
 
 if [ "$option" = "syntax" -o "$option" = "all" ]; then
 
     for modified_file in ${files}; do
+        # TODO check file exists
         after=${after}"\n==\n(After) File: $modified_file\n==\n"
         after=$after"$(php local/codechecker/run.php $modified_file)"
-        # TODO moodlecheck
+        after=$after"$(php local/moodlecheck/cli/moodlecheck.php -p=$modified_file)"
     done;
 
     stash="$(git stash)"
 
-    git checkout ${beforecommit}
+    git checkout ${mainbranch} 2> /dev/null
 
     for modified_file in ${files}; do
+        # TODO check file exists
         before=${before}"\n==\n(Before) File: $modified_file\n==\n"
         before=$before"$(php local/codechecker/run.php $modified_file)"
-        # TODO moodlecheck
+        before=$before"$(php local/moodlecheck/cli/moodlecheck.php -p=$modified_file)"
     done;
 
-    git checkout ${aftercommit}
+    git checkout @{-1} 2> /dev/null
 
     if [ ! "$stash" = "No local changes to save" ]; then
         git stash pop > /dev/null
@@ -82,10 +83,10 @@ if [ "$option" = "test" -o "$option" = "all" ]; then
             fi
 
             if [ -d "$testDir"/behat ]; then
-                tests="$(ls -1d ${testDir}behat/*)"
+                tests="$(ls -1d ${testDir}behat/* | grep \.feature)"
 
                 while read -r test; do
-                    commands=$commands"mdk behat -r -u "$test$'\n'
+                    commands=$commands"mdk behat -r -f "$test$'\n'
                 done <<< "$tests"
             fi
 
