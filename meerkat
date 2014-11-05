@@ -85,7 +85,7 @@ if [ "$option" = "test" -o "$option" = "all" ]; then
                 tests="$(ls -1d ${testDir}behat/*)"
 
                 while read -r test; do
-                    commands=$commands"mdk phpunit -r -u "$test$'\n'
+                    commands=$commands"mdk behat -r -u "$test$'\n'
                 done <<< "$tests"
             fi
 
