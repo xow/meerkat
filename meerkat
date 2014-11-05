@@ -10,39 +10,35 @@ files="$(git diff $defaultstart $defaultend --name-only)"
 
 if [ "$option" = "syntax" -o "$option" = "all" ]; then
 
-    for modified_file in ${files}
-    do
-        after=${after}"==\nFile: $modified_file\n==\n"
+    for modified_file in ${files}; do
+        after=${after}"\n==\nFile: $modified_file\n==\n"
         after=$after"$(php local/codechecker/run.php $modified_file)"
+        # TODO moodlecheck
     done;
 
-    # TODO: stash first
+    stash="$(git stash)"
 
     git checkout ${revision1} -- .
 
-    if [ "$option" = "syntax" ]; then
-        for modified_file in ${files}
-        do
-            before=${before}"==\nFile: $modified_file\n==\n"
-            before=$before"$(php local/codechecker/run.php $modified_file)"
-        done;
-    fi
+    for modified_file in ${files}; do
+        before=${before}"\n==\nFile: $modified_file\n==\n"
+        before=$before"$(php local/codechecker/run.php $modified_file)"
+        # TODO moodlecheck
+    done;
 
     git checkout HEAD .
 
-    # TODO: stash pop
+    if [ ! "$stash" = "No local changes to save" ]; then
+        git stash pop > /dev/null
+    fi
 
-    #after="$(sed <(printf "${after}") 's/^ *[0-9]*//')"
-    #before="$(sed <(printf "${before}") 's/^ *[0-9]*//')"
-
-    printf "${after}" | less
-    printf "${before}" | less
-
-    #diff --new-line-format="" -13 <(printf "${after}") <(printf "${after}") | less
+    diff -y <(printf "${after}") <(printf "${before}") | less
 
 fi
 
 if [ "$option" = "test" -o "$option" = "all" ]; then
+
+    paths=""
 
     for modified_file in ${files}
     do
@@ -53,6 +49,7 @@ if [ "$option" = "test" -o "$option" = "all" ]; then
 
             if [ -n "$currentPath" ]; then
                 tryDir="$currentPath"tests/
+
                 if [ -d "$tryDir" ]; then
                     testDir=$tryDir
                 fi
@@ -63,31 +60,38 @@ if [ "$option" = "test" -o "$option" = "all" ]; then
 
         done
 
+        paths="$paths"$'\n'"$testDir"
+        testDir=""
+
     done;
 
     # sort | uniq
 
-    if [ -n "$currentPath" ]; then
+    if [ -n "$paths" ]; then
 
-        if [ -d "$testDir" ]; then
-            tests="$(ls -1d $testDir* | grep _test\.php)"
+        paths=$(sort <(printf "$paths"))
+        paths=$(uniq <(printf "$paths"))
 
-            while read -r test; do
-                echo "mdk phpunit -r -u "$test
-            done <<< "$tests"
-        fi
+        for testDir in ${paths}; do
 
-        if [ -d "$testDir"/behat ]; then
-            tests="$(ls -1d ${testDir}behat/*)"
+            if [ -d "$testDir" ]; then
+                tests="$(ls -1d $testDir* | grep _test\.php)"
 
-            while read -r test; do
-                echo "mdk behat -r -f "$test
-            done <<< "$tests"
-        fi
+                while read -r test; do
+                    echo "mdk phpunit -r -u "$test
+                done <<< "$tests"
+            fi
+
+            if [ -d "$testDir"/behat ]; then
+                tests="$(ls -1d ${testDir}behat/*)"
+
+                while read -r test; do
+                    echo "mdk behat -r -f "$test
+                done <<< "$tests"
+            fi
+
+        done;
 
     fi
 
 fi
-
-# testdir = the first ancestor directory with a folder called tests
-# ls -1d mod/forum/tests/* | grep "_test\.php" | xargs mdk phpunit -r -u
