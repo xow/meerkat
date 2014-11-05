@@ -3,10 +3,10 @@
 defaultoption=syntax
 option=${1-$defaultoption}
 
-defaultstart=master # TODO this should be MOODLE_27_STABLE if need be
-defaultend=HEAD
+beforecommit=master # TODO this should be MOODLE_27_STABLE if need be
+aftercommit=HEAD
 
-files="$(git diff $defaultstart $defaultend --name-only)"
+files="$(git diff $beforecommit $aftercommit --name-only)"
 
 if [ "$option" = "syntax" -o "$option" = "all" ]; then
 
@@ -18,7 +18,7 @@ if [ "$option" = "syntax" -o "$option" = "all" ]; then
 
     stash="$(git stash)"
 
-    git checkout ${revision1} -- .
+    git checkout ${beforecommit} -- .
 
     for modified_file in ${files}; do
         before=${before}"\n==\nFile: $modified_file\n==\n"
@@ -26,13 +26,13 @@ if [ "$option" = "syntax" -o "$option" = "all" ]; then
         # TODO moodlecheck
     done;
 
-    git checkout HEAD .
+    git checkout ${aftercommit} .
 
     if [ ! "$stash" = "No local changes to save" ]; then
         git stash pop > /dev/null
     fi
 
-    diff -y <(printf "${after}") <(printf "${before}") | less
+    diff -y <(printf "${before}") <(printf "${after}")
 
 fi
 
@@ -40,8 +40,7 @@ if [ "$option" = "test" -o "$option" = "all" ]; then
 
     paths=""
 
-    for modified_file in ${files}
-    do
+    for modified_file in ${files}; do
 
         currentPath=$modified_file
 
@@ -55,8 +54,8 @@ if [ "$option" = "test" -o "$option" = "all" ]; then
                 fi
             fi
 
-            currentDirectory="${currentPath%?}"
-            currentPath="$(echo $currentDirectory | grep -oh '^.*/')"
+            currentPath="${currentPath%?}"
+            currentPath="$(echo $currentPath | grep -oh '^.*/')"
 
         done
 
@@ -78,7 +77,7 @@ if [ "$option" = "test" -o "$option" = "all" ]; then
                 tests="$(ls -1d $testDir* | grep _test\.php)"
 
                 while read -r test; do
-                    echo "mdk phpunit -r -u "$test
+                    commands=$commands"mdk phpunit -r -u "$test$'\n'
                 done <<< "$tests"
             fi
 
@@ -86,11 +85,26 @@ if [ "$option" = "test" -o "$option" = "all" ]; then
                 tests="$(ls -1d ${testDir}behat/*)"
 
                 while read -r test; do
-                    echo "mdk behat -r -f "$test
+                    commands=$commands"mdk phpunit -r -u "$test$'\n'
                 done <<< "$tests"
             fi
 
         done;
+
+        if [ "$2" = "-r" ]; then
+
+            commands="${commands%?}"
+
+            while read -r command; do
+                printf $'\n==\n'"running $command"$'\n==\n'
+                eval $command
+            done <<< "$commands"
+
+        else
+
+            printf "${commands}"
+
+        fi
 
     fi
 
