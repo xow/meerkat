@@ -11,22 +11,22 @@ files="$(git diff $beforecommit $aftercommit --name-only)"
 if [ "$option" = "syntax" -o "$option" = "all" ]; then
 
     for modified_file in ${files}; do
-        after=${after}"\n==\nFile: $modified_file\n==\n"
+        after=${after}"\n==\n(After) File: $modified_file\n==\n"
         after=$after"$(php local/codechecker/run.php $modified_file)"
         # TODO moodlecheck
     done;
 
     stash="$(git stash)"
 
-    git checkout ${beforecommit} -- .
+    git checkout ${beforecommit}
 
     for modified_file in ${files}; do
-        before=${before}"\n==\nFile: $modified_file\n==\n"
+        before=${before}"\n==\n(Before) File: $modified_file\n==\n"
         before=$before"$(php local/codechecker/run.php $modified_file)"
         # TODO moodlecheck
     done;
 
-    git checkout ${aftercommit} .
+    git checkout ${aftercommit}
 
     if [ ! "$stash" = "No local changes to save" ]; then
         git stash pop > /dev/null
