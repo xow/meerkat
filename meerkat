@@ -66,8 +66,6 @@ if [ "$option" = "test" -o "$option" = "all" ]; then
 
     done;
 
-    # TODO sort | uniq
-
     if [ -n "$paths" ]; then
 
         paths=$(sort <(printf "$paths"))
