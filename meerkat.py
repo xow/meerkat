@@ -88,7 +88,6 @@ class MeerkatCommand(Command):
             ['--behat'],
             {
                 'action': 'store_true',
-                'default': 'behat',
                 'help': 'Run behat tests as well as unit tests'
             }
         ),
@@ -125,9 +124,9 @@ class MeerkatCommand(Command):
                 after += '\n=====\n(After) File: %s\n=====\n' % modifiedFile
                 after += self.syntaxCheck(modifiedFile)
 
-            git.checkout(args.branch)
-
             stashed = git.stash()
+
+            git.checkout(args.branch)
 
             for modifiedFile in modifiedFiles:
                 before += '\n=====\n(Before) File: %s\n=====\n' % modifiedFile
@@ -181,7 +180,7 @@ class MeerkatCommand(Command):
                 commands = ['mdk phpunit -r -u %s' % s for s in unitTests]
 
                 if (args.behat):
-                    commands.extend(['mdk behat -r -f %s' % s for s in unitTests])
+                    commands.extend(['mdk behat -r -f %s' % s for s in behatTests])
 
                 for command in commands:
                     if (args.run):
