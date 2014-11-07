@@ -4,6 +4,7 @@ defaultoption=syntax
 option=${1-$defaultoption}
 
 mainbranch=master # TODO this should be MOODLE_27_STABLE if need be
+# TODO add ability to run for testing (select a commit)
 
 files="$(git diff $mainbranch HEAD --name-only)"
 
@@ -11,7 +12,7 @@ if [ "$option" = "syntax" -o "$option" = "all" ]; then
 
     for modified_file in ${files}; do
         # TODO check file exists
-        after=${after}"\n==\n(After) File: $modified_file\n==\n"
+        after=${after}"\n=====\n(After) File: $modified_file\n=====\n"
         after=$after"$(php local/codechecker/run.php $modified_file)"
         after=$after"$(php local/moodlecheck/cli/moodlecheck.php -p=$modified_file)"
     done;
@@ -22,7 +23,7 @@ if [ "$option" = "syntax" -o "$option" = "all" ]; then
 
     for modified_file in ${files}; do
         # TODO check file exists
-        before=${before}"\n==\n(Before) File: $modified_file\n==\n"
+        before=${before}"\n=====\n(Before) File: $modified_file\n=====\n"
         before=$before"$(php local/codechecker/run.php $modified_file)"
         before=$before"$(php local/moodlecheck/cli/moodlecheck.php -p=$modified_file)"
     done;
@@ -65,7 +66,7 @@ if [ "$option" = "test" -o "$option" = "all" ]; then
 
     done;
 
-    # sort | uniq
+    # TODO sort | uniq
 
     if [ -n "$paths" ]; then
 
@@ -97,7 +98,7 @@ if [ "$option" = "test" -o "$option" = "all" ]; then
             commands="${commands%?}"
 
             while read -r command; do
-                printf $'\n==\n'"running $command"$'\n==\n'
+                printf $'\n=====\n'"running $command"$'\n=====\n'
                 eval $command
             done <<< "$commands"
 
