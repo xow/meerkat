@@ -84,6 +84,14 @@ class MeerkatCommand(Command):
                 'help': 'define the mode to use'
             }
         ),
+        (
+            ['--behat'],
+            {
+                'action': 'store_true',
+                'default': 'behat',
+                'help': 'Run behat tests as well as unit tests'
+            }
+        ),
     ]
     _description = 'Tools to help you peer review an issue, or automatically check your issue before submitting for peer review'
 
@@ -102,9 +110,6 @@ class MeerkatCommand(Command):
         elif args.all:
             mode = 'all'
 
-        run = args.run
-        branch = args.branch
-
         git = M.git()
 
         # TODO if codechecker is not installed, then mdk plugin install local_codechecker
@@ -112,7 +117,7 @@ class MeerkatCommand(Command):
 
         after = ''
         before = ''
-        modifiedFiles = git.modifiedFiles(branch)
+        modifiedFiles = git.modifiedFiles(args.branch)
 
         if mode in ('syntax', 'all'):
 
@@ -120,7 +125,7 @@ class MeerkatCommand(Command):
                 after += '\n=====\n(After) File: %s\n=====\n' % modifiedFile
                 after += self.syntaxCheck(modifiedFile)
 
-            git.checkout(branch)
+            git.checkout(args.branch)
 
             stashed = git.stash()
 
@@ -138,10 +143,11 @@ class MeerkatCommand(Command):
 
         if mode in ('test', 'all'):
 
-            testDirectory = None
             testDirectories = []
 
             for modifiedFile in modifiedFiles:
+
+                testDirectory = None
 
                 currentPath = modifiedFile
 
@@ -158,10 +164,30 @@ class MeerkatCommand(Command):
 
 
                 testDirectories.append(testDirectory)
-                testDirectory = ''
 
             testDirectories = list(set(testDirectories))
-            print testDirectories
+
+            for testDirectory in testDirectories:
+
+                unitTests = []
+                behatTests = []
+
+                unitTests.extend(self.getSubfilesWithExtension(testDirectory, '_test.php'))
+
+                if os.path.isdir('%s/behat' % testDirectory):
+
+                    behatTests.extend(self.getSubfilesWithExtension(testDirectory, '.feature'))
+
+                commands = ['mdk phpunit -r -u %s' % s for s in unitTests]
+
+                if (args.behat):
+                    commands.extend(['mdk behat -r -f %s' % s for s in unitTests])
+
+                for command in commands:
+                    if (args.run):
+                        print self.runCommand(command)
+                    else:
+                        print command
 
     def syntaxCheck(self, file):
 
@@ -172,3 +198,28 @@ class MeerkatCommand(Command):
         diagnosis += mooodlecheck.communicate()[0];
 
         return diagnosis
+
+    def getSubfilesWithExtension(self, folder, extension):
+
+        subfilesWithExtension = []
+
+        subfiles = os.listdir(folder)
+
+        for file in subfiles:
+
+            fileWithPath = folder + '/' + file
+
+            try:
+
+                file.index('_test.php')
+                subfilesWithExtension.append(fileWithPath)
+
+            except ValueError as e:
+                pass
+
+        return subfilesWithExtension
+
+    def runCommand(self, command):
+
+        program = Popen(command.split(' '), stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+        return program.communicate()[0]
