@@ -112,17 +112,17 @@ class MeerkatCommand(Command):
 
         after = ''
         before = ''
-        modifiedFiles = git.patchedFiles(branch)
+        modifiedFiles = git.modifiedFiles(branch)
 
         if mode in ('syntax', 'all'):
-
-            stashed = git.stash()
 
             for modifiedFile in modifiedFiles:
                 after += '\n=====\n(After) File: %s\n=====\n' % modifiedFile
                 after += self.syntaxCheck(modifiedFile)
 
             git.checkout(branch)
+
+            stashed = git.stash()
 
             for modifiedFile in modifiedFiles:
                 before += '\n=====\n(Before) File: %s\n=====\n' % modifiedFile
@@ -158,6 +158,7 @@ class MeerkatCommand(Command):
 
 
                 testDirectories.append(testDirectory)
+                testDirectory = ''
 
             testDirectories = list(set(testDirectories))
             print testDirectories
