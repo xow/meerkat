@@ -116,13 +116,13 @@ class MeerkatCommand(Command):
 
         if mode in ('syntax', 'all'):
 
+            stashed = git.stash()
+
             for modifiedFile in modifiedFiles:
                 after += '\n=====\n(After) File: %s\n=====\n' % modifiedFile
                 after += self.syntaxCheck(modifiedFile)
 
             git.checkout(branch)
-
-            stashed = git.stash()
 
             for modifiedFile in modifiedFiles:
                 before += '\n=====\n(Before) File: %s\n=====\n' % modifiedFile
@@ -139,22 +139,28 @@ class MeerkatCommand(Command):
         if mode in ('test', 'all'):
 
             testDirectory = None
+            testDirectories = []
 
             for modifiedFile in modifiedFiles:
 
-                currentPath = modifiedFile adfsdfasdas
+                currentPath = modifiedFile
 
                 while not testDirectory and currentPath:
 
-                    print currentPath
+                    candidate = '%s/tests' % currentPath
+                    if os.path.isdir(candidate):
+                        testDirectory = candidate
+
                     try:
                         currentPath = currentPath[:currentPath.rindex('/')]
                     except ValueError as e:
-                        currentPath = ""
+                        currentPath = ''
 
 
-                print currentPath
+                testDirectories.append(testDirectory)
 
+            testDirectories = list(set(testDirectories))
+            print testDirectories
 
     def syntaxCheck(self, file):
 
