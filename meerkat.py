@@ -31,6 +31,7 @@ from ..command import Command
 from ..tools import question, ProcessInThread
 from subprocess import Popen, PIPE, STDOUT
 import os
+import difflib
 
 
 class MeerkatCommand(Command):
@@ -42,6 +43,14 @@ class MeerkatCommand(Command):
                 'action': 'store_true',
                 'dest': 'syntax',
                 'help': 'syntax mode. Will give an overview of any syntax errors added'
+            }
+        ),
+        (
+            ['-o', '--old-syntax'],
+            {
+                'action': 'store_true',
+                'dest': 'oldSyntax',
+                'help': 'Also show the old syntax errors so that you can compare'
             }
         ),
         (
@@ -124,20 +133,28 @@ class MeerkatCommand(Command):
                 after += '\n=====\n(After) File: %s\n=====\n' % modifiedFile
                 after += self.syntaxCheck(modifiedFile)
 
-            stashed = git.stash()
+            if args.oldSyntax:
 
-            git.checkout(args.branch)
+                stashed = git.stash()
 
-            for modifiedFile in modifiedFiles:
-                before += '\n=====\n(Before) File: %s\n=====\n' % modifiedFile
-                before += self.syntaxCheck(modifiedFile)
-            
-            git.checkout('@{-1}')
+                git.checkout(args.branch)
 
-            if (stashed):
-                git.stash(command='pop')
+                for modifiedFile in modifiedFiles:
+                    before += '\n=====\n(Before) File: %s\n=====\n' % modifiedFile
+                    before += self.syntaxCheck(modifiedFile)
+                
+                git.checkout('@{-1}')
 
-            print before
+                if (stashed):
+                    git.stash(command='pop')
+
+                #os.environ['before'] = before
+                #os.environ['after'] = after
+
+                #subprocess('diff -y <(printf "${before}") <(printf "${after}")')
+
+                print before
+
             print after
 
         if mode in ('test', 'all'):
