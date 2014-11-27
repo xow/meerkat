@@ -192,7 +192,7 @@ class MeerkatCommand(Command):
 
                 if os.path.isdir('%s/behat' % testDirectory):
 
-                    behatTests.extend(self.getSubfilesWithExtension(testDirectory, '.feature'))
+                    behatTests.extend(self.getSubfilesWithExtension('%s/behat' % testDirectory, '.feature'))
 
                 commands = ['mdk phpunit -r -u %s' % s for s in unitTests]
 
@@ -227,7 +227,7 @@ class MeerkatCommand(Command):
 
             try:
 
-                file.index('_test.php')
+                file.index(extension)
                 subfilesWithExtension.append(fileWithPath)
 
             except ValueError as e:
