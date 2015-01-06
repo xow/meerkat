@@ -203,7 +203,7 @@ class MeerkatCommand(Command):
                     if (args.run):
                         print self.runCommand(command)
                     else:
-                        print command
+                        print '%s &&' % command,
 
     def syntaxCheck(self, file):
 
