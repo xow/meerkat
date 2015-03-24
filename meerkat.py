@@ -58,7 +58,7 @@ class MeerkatCommand(Command):
             {
                 'action': 'store_true',
                 'dest': 'test',
-                'help': 'test mode. Will give you commands to run to test this patch, or run the commands automatically with -r'
+                'help': 'test mode. Will give you commands to unit test and behat test this patch, or run the commands automatically with -r'
             }
         ),
         (
@@ -94,10 +94,25 @@ class MeerkatCommand(Command):
             }
         ),
         (
+            ['-u', '--unit'],
+            {
+                'action': 'store_true',
+                'help': 'Run unit tests only'
+            }
+        ),
+        (
             ['--behat'],
             {
                 'action': 'store_true',
-                'help': 'Run behat tests as well as unit tests'
+                'help': 'Run behat tests only'
+            }
+        ),
+        (
+            ['-l', '--commands-on-lines'],
+            {
+                'action': 'store_true',
+                'dest': 'linify',
+                'help': 'Print out test commands on seperate lines'
             }
         ),
     ]
@@ -110,52 +125,59 @@ class MeerkatCommand(Command):
             raise Exception('This is not a Moodle instance')
 
         # Get the mode.
-        mode = args.mode
         if args.syntax:
             mode = 'syntax'
         elif args.test:
             mode = 'test'
         elif args.all:
             mode = 'all'
+        else:
+            if args.behat or args.unit:
+                mode = 'test'
+            elif args.mode:
+                mode = args.mode
 
         git = M.git()
 
         # TODO if codechecker is not installed, then mdk plugin install local_codechecker
         # TODO if moodlecheck is not installed, then mdk plugin install local_moodlecheck
 
-        after = ''
-        before = ''
         modifiedFiles = git.modifiedFiles(args.branch)
 
         if mode in ('syntax', 'all'):
 
             for modifiedFile in modifiedFiles:
-                after += '\n=====\n(After) File: %s\n=====\n' % modifiedFile
-                after += self.syntaxCheck(modifiedFile)
 
-            if args.oldSyntax:
-
-                stashed = git.stash()
-
-                git.checkout(args.branch)
-
-                for modifiedFile in modifiedFiles:
-                    before += '\n=====\n(Before) File: %s\n=====\n' % modifiedFile
-                    before += self.syntaxCheck(modifiedFile)
+                print '%s:' % modifiedFile
                 
-                git.checkout('@{-1}')
+                diff = self.runCommand("git diff %s %s" % (args.branch, modifiedFile))
 
-                if (stashed):
-                    git.stash(command='pop')
+                changedLineNums = []
+                ranges = re.findall(r'@@.*-(.*),(.*)\+(.*),(.*)@@.*\n(.*\n([^@].*\n)*^)', diff, re.MULTILINE)
 
-                #os.environ['before'] = before
-                #os.environ['after'] = after
+                for lineRange in ranges:
+                    start = int(lineRange[2])
+                    lineNo = start
 
-                #subprocess('diff -y <(printf "${before}") <(printf "${after}")')
+                    thisDiff = lineRange[4].splitlines()
+                    for diffLine in thisDiff:
+                        if re.match(r'\s*\+', diffLine):
+                            changedLineNums.append(lineNo)
+                        if re.match(r'\s*\-', diffLine):
+                            lineNo -= 1
+                        lineNo += 1
 
-                print before
+                changedLinesRegex = '|'.join([str(x) for x in changedLineNums])
 
-            print after
+                syntaxResults = self.syntaxCheck(modifiedFile)
+                changedLines = re.findall('(^\s*(' + changedLinesRegex + ')\s+\|\s*([^\s]*)\s+\|\s+(.*$.*(\n\s*\|.*$)*))', syntaxResults, re.MULTILINE)
+                for changedLine in changedLines:
+                    print changedLine[1] + ' (codechecker ' + changedLine[2].lower() + '): ' + re.sub(r'\n\s*\|\s*\| ', ' ', changedLine[3], 0, re.MULTILINE)
+
+                docsResults = self.docsCheck(modifiedFile)
+                changedLines = re.findall('(.*\sline="(' + changedLinesRegex + ')"\sseverity="([^"]*)"\smessage="([^"]*)".*)', docsResults, re.MULTILINE)
+                for changedLine in changedLines:
+                    print changedLine[1] + ' (moodlecheck ' + changedLine[2].lower() + '): ' + changedLine[3]
 
         if mode in ('test', 'all'):
 
@@ -178,7 +200,6 @@ class MeerkatCommand(Command):
                     except ValueError as e:
                         currentPath = ''
 
-
                 testDirectories.append(testDirectory)
 
             testDirectories = list(set(testDirectories))
@@ -188,36 +209,43 @@ class MeerkatCommand(Command):
                 unitTests = []
                 behatTests = []
 
+
                 unitTests.extend(self.getSubfilesWithExtension(testDirectory, '_test.php'))
 
                 if os.path.isdir('%s/behat' % testDirectory):
 
                     behatTests.extend(self.getSubfilesWithExtension('%s/behat' % testDirectory, '.feature'))
 
-                commands = ['mdk phpunit -r -u %s' % s for s in unitTests]
+                commands = []
 
-                if (args.behat):
+                if (not args.behat or args.unit):
+                    commands.extend(['mdk phpunit -r -u %s' % s for s in unitTests])
+
+                if (args.behat or not args.unit):
                     commands.extend(['mdk behat -r -f %s' % s for s in behatTests])
 
                 for command in commands:
                     if (args.run):
                         print self.runCommand(command)
+                    elif (args.linify):
+                        print '%s\n' % command,
                     else:
                         print '%s &&' % command,
 
     def syntaxCheck(self, file):
-
         codechecker = Popen(['php', 'local/codechecker/run.php', file], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
-        diagnosis = codechecker.communicate()[0];
+        return codechecker.communicate()[0]
 
+    def docsCheck(self, file):
         mooodlecheck = Popen(['php', 'local/moodlecheck/cli/moodlecheck.php', '-p=%s' % file], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
-        diagnosis += mooodlecheck.communicate()[0];
-
-        return diagnosis
+        return mooodlecheck.communicate()[0]
 
     def getSubfilesWithExtension(self, folder, extension):
 
         subfilesWithExtension = []
+
+        if folder is None:
+            return []
 
         subfiles = os.listdir(folder)
 
